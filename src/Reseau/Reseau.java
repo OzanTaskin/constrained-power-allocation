@@ -270,6 +270,9 @@ public class Reseau {
     }
 
     public void solveurNaif(){
+        if (getMaisons().isEmpty() || generateurs.isEmpty()) {
+            return;
+        }
         int i=0, k=10000;
 
         List<Maison> maisons = new ArrayList<>(getMaisons());
