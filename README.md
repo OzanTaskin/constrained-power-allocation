@@ -185,13 +185,13 @@ Cette règle ramène la température vers un plafond 0.4·T0 :
 - si T < 0.4·T0, la réchauffe augmente T (jusqu’au plafond) ;
 - si T > 0.4·T0, la réchauffe diminue T (retour au plafond).
 
-![Évolution de la température](sa_temperature_reheats.png)
+![Évolution de la température](assets/images/sa_temperature_reheats.png)
 
 ### 5.5 Minima locaux et optimum global (intuition)
 
 Le recuit peut stagner dans un minimum local. Grâce à la température (acceptations probabilistes) et au mécanisme de réchauffe, il peut accepter temporairement des dégradations et sortir du bassin local, puis converger vers une région meilleure.
 
-![Minimum local et optimum global](sa_local_global_landscape_clear.png)
+![Minimum local et optimum global](assets/images/sa_local_global_landscape_clear.png)
 
 Note : sur la figure, les flèches noires représentent la trajectoire ; les flèches d’annotation (minimum local / optimum global) sont distinctes.
 
@@ -227,7 +227,7 @@ But : introduire une dégradation contrôlée afin d’explorer une autre régio
 
 Après la perturbation, l’algorithme relance recuit simulé puis descente locale. La meilleure solution globale (best-so-far) est conservée sur l’ensemble des restarts.
 
-![ILS : synthèse par restart](ils_phases_report.png)
+![ILS : synthèse par restart](assets/images/ils_phases_report.png)
 
 ---
 
