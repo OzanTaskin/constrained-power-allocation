@@ -40,7 +40,7 @@ public class ReseauFactory {
     public static Reseau parserReseau(double penalite, String fichier)
             throws FileNotFoundException, IOException {
 
-        Reseau r = new Reseau("r", penalite);
+        Reseau r = new Reseau(penalite);
 
         boolean maisonsCommencees = false;
         boolean connexionsCommencees = false;

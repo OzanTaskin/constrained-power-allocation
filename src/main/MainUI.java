@@ -1,4 +1,4 @@
-package UI.main;
+package main;
 
 import UI.controller.MainController;
 import UI.view.ControlsView;
@@ -13,11 +13,7 @@ import javafx.scene.Scene;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.layout.BorderPane;
 import javafx.stage.Stage;
-import reseau.Generateur;
-import reseau.Maison;
 import reseau.Reseau;
-
-import java.io.File;
 
 public class MainUI extends Application {
 
@@ -35,11 +31,11 @@ public class MainUI extends Application {
                 reseau = ReseauFactory.parserReseau(10, filePath);
                 terminalView.appendText("Réseau chargé depuis : " + filePath + "\n");
             } catch (Exception e) {
-                reseau = new Reseau("Mon Réseau", 10);
+                reseau = new Reseau(10);
                 terminalView.appendText("Erreur lors du chargement du fichier : " + e.getMessage() + "\n");
             }
         } else {
-            reseau = new Reseau("Mon Réseau", 10);
+            reseau = new Reseau(10);
         }
 
 

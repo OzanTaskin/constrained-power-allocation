@@ -72,6 +72,8 @@ public class MainController {
             networkView.update();
         } catch (NumberFormatException e) {
             terminal.appendText("Erreur: La capacité doit être un nombre entier.\n");
+        } catch (IllegalArgumentException e) {
+            terminal.appendText("Erreur: " + e.getMessage() + "\n");
         }
     }
 
@@ -105,6 +107,13 @@ public class MainController {
             terminal.appendText("Erreur : Veuillez sélectionner une maison et un générateur.\n");
             return;
         }
+
+        Maison maison = reseau.getMaison(maisonNom);
+        if (maison != null && reseau.maisonConnecte(maison)) {
+            terminal.appendText("Connexion déjà existante.\n");
+            return;
+        }
+
         reseau.addConnexion(maisonNom, generateurNom);
         terminal.appendText("Connexion ajoutée entre '" + maisonNom + "' et '" + generateurNom + "'.\n");
         networkView.update();

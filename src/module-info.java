@@ -3,11 +3,13 @@ module UI {
     requires javafx.fxml;
     requires java.desktop;
 
-    exports UI.main;
     exports UI.controller;
     exports UI.view;
-    opens UI.main to javafx.fxml;
     opens UI.controller to javafx.fxml;
     opens UI.view to javafx.fxml;
+    exports main;
+    opens main to javafx.fxml;
+    exports menu;
+    opens menu to javafx.fxml;
 
 }

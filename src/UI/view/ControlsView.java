@@ -29,7 +29,7 @@ public class ControlsView extends VBox {
         setPadding(new Insets(10));
         setSpacing(10);
 
-        // --- Add Generateur ---
+        // --- Ajout d'un générateur ---
         Label titleGenerateur = new Label("Ajouter un générateur");
         titleGenerateur.setStyle("-fx-font-weight: bold;");
 
@@ -49,7 +49,7 @@ public class ControlsView extends VBox {
         gridGenerateur.add(capaciteField, 1, 1);
         gridGenerateur.add(addGenerateurButton, 1, 2);
 
-        // --- Add Maison ---
+        // --- Ajout d'une maison ---
         Label titleMaison = new Label("Ajouter une maison");
         titleMaison.setStyle("-fx-font-weight: bold;");
 
@@ -70,7 +70,7 @@ public class ControlsView extends VBox {
         gridMaison.add(consommationComboBox, 1, 1);
         gridMaison.add(addMaisonButton, 1, 2);
 
-        // --- Add Connection ---
+        // --- Ajout d'une connexion ---
         Label titleConnection = new Label("Ajouter une connexion");
         titleConnection.setStyle("-fx-font-weight: bold;");
 
@@ -93,7 +93,7 @@ public class ControlsView extends VBox {
         titleActions.setStyle("-fx-font-weight: bold;");
 
         saveButton = new Button("Sauvegarder");
-        solveButton = new Button("Résoudre");
+        solveButton = new Button("Optimiser");
 
         VBox actionsBox = new VBox(10, saveButton, solveButton);
 
@@ -108,7 +108,7 @@ public class ControlsView extends VBox {
         );
     }
 
-    // Getters for controller to access components
+    // Getters pour que le contrôleur puisse accéder aux composants
     public TextField getNomGenerateurField() { return nomGenerateurField; }
     public TextField getCapaciteField() { return capaciteField; }
     public Button getAddGenerateurButton() { return addGenerateurButton; }

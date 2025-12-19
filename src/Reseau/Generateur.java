@@ -26,9 +26,13 @@ public class Generateur {
      * La charge actuelle est initialisée à 0.
      *
      * @param nom le nom identifiant du générateur
-     * @param capacite la capacité maximale en kW
+     * @param capacite la capacité maximale en kW, ne peut pas être négative.
+     * @throws IllegalArgumentException si la capacité est négative.
      */
     public Generateur(String nom, int capacite) {
+        if (capacite < 0) {
+            throw new IllegalArgumentException("La capacité d'un générateur ne peut pas être négative.");
+        }
         this.capacite = capacite;
         this.nom = nom;
         this.chargeActuelle = 0;

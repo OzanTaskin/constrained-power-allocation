@@ -21,7 +21,7 @@ public class NetworkView extends Pane {
 
     public NetworkView(Reseau reseau) {
         this.reseau = reseau;
-        setStyle("-fx-background-color: #f0f0f0;"); // Light gray background
+        setStyle("-fx-background-color: #f0f0f0;"); // Arrière-plan gris clair
     }
 
     public void update() {
@@ -31,11 +31,11 @@ public class NetworkView extends Pane {
 
         drawGenerateurs();
         drawMaisons();
-        drawConnections(); // Connections should be drawn after circles to be on top
+        drawConnections(); // Les connexions doivent être dessinées après les cercles pour être au-dessus
 
-        // Adjust pane size to fit all content, for the ScrollPane
+        // Ajuster la taille du panneau pour s'adapter à tout le contenu, pour le ScrollPane
         int maxItems = Math.max(reseau.getGenerateurs().size(), reseau.getMaisons().size());
-        double paneHeight = Math.max(600, (maxItems * 80.0) + 50); // 80px per item + 50px bottom buffer
+        double paneHeight = Math.max(600, (maxItems * 80.0) + 50); // 80px par item + 50px de marge inférieure
         setPrefSize(600, paneHeight);
     }
 
@@ -44,8 +44,9 @@ public class NetworkView extends Pane {
         double y = 50;
         for (Generateur generateur : reseau.getGenerateurs()) {
             Circle circle = new Circle(x, y, 20, Color.BLUE);
+            Text nameText = new Text(x - (generateur.getNom().length() * 3), y - 30, generateur.getNom());
             Text text = new Text(x - 40, y + 35, "Capacité: " + generateur.getCapacite());
-            getChildren().addAll(circle, text);
+            getChildren().addAll(circle, nameText, text);
             generateurCircles.put(generateur, circle);
             y += 80;
         }
@@ -56,15 +57,16 @@ public class NetworkView extends Pane {
         double y = 50;
         for (Maison maison : reseau.getMaisons()) {
             Circle circle = new Circle(x, y, 20, Color.GREEN);
+            Text nameText = new Text(x - (maison.getNom().length() * 3), y - 30, maison.getNom());
             Text text = new Text(x - 50, y + 35, "Consommation: " + maison.getConsommation());
-            getChildren().addAll(circle, text);
+            getChildren().addAll(circle, nameText, text);
             maisonCircles.put(maison, circle);
             y += 80;
         }
     }
 
     private void drawConnections() {
-        // Ensure lines are drawn behind the circles by inserting them at the beginning of the children list
+        // S'assurer que les lignes sont dessinées derrière les cercles en les insérant au début de la liste des enfants
         int lineInsertIndex = 0;
         for (Map.Entry<Maison, Generateur> entry : reseau.getConnexions().entrySet()) {
             Maison maison = entry.getKey();
@@ -80,7 +82,7 @@ public class NetworkView extends Pane {
                             generateurCircle.getCenterX(), generateurCircle.getCenterY()
                     );
                     line.setStroke(Color.BLACK);
-                    getChildren().add(lineInsertIndex++, line); // Add line at the back
+                    getChildren().add(lineInsertIndex++, line); // Ajouter la ligne à l'arrière
                 }
             }
         }

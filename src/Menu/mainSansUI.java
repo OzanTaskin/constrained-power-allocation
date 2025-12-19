@@ -10,7 +10,7 @@ import java.util.Scanner;
 public class MainSansUI {
     public static void main(String[] args) throws IOException {
         Scanner sc = new Scanner(System.in);
-        Reseau r = new Reseau("r",10);
+        Reseau r = new Reseau(10);
         /**
          *  Récupère les arguments mis en ligne de commande pour savoir si on passe directement au Menu3 ou d'abord par le Menu1
          */

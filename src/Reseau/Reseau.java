@@ -44,10 +44,9 @@ public class Reseau {
     /**
      * Crée un nouveau réseau électrique vide.
      *
-     * @param nom le nom identifiant du réseau
      * @param penalite le coefficient de pénalité pour les surcharges
      */
-    public Reseau(String nom, double penalite) {
+    public Reseau(double penalite) {
         this.generateurs = new ArrayList<Generateur>();
         this.connexions = new HashMap<Maison, Generateur>();
         this.penalite = penalite;
