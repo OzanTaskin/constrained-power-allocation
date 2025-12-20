@@ -110,10 +110,10 @@ public class ControlsView extends VBox {
         VBox actionsBox = new VBox(10, saveButton, solveButton);
         actionsSection.getChildren().addAll(titleActions, actionsBox);
 
-
+        //On empeche l'ajout de maison et de generateur si un fichier est passé en paramètre
         if (fileProvided) {
             generateurSection.setVisible(false);
-            generateurSection.setManaged(false); // Does not take up space
+            generateurSection.setManaged(false);
             maisonSection.setVisible(false);
             maisonSection.setManaged(false);
             connectionSection.setVisible(false);
