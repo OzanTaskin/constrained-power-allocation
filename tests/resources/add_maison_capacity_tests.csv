@@ -1,0 +1,5 @@
+generateurCapacity,maisonsToAdd,shouldThrow
+30,"NORMAL,BASSE,BASSE",true
+100,"NORMAL,BASSE,FORTE",false
+0,"NORMAL,BASSE,BASSE",true
+10,"FORTE,BASSE,BASSE",true

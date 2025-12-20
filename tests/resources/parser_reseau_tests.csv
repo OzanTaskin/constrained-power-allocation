@@ -1,0 +1,3 @@
+content,penalite,expectedGenerateurCount,expectedMaisonCount,generateurName,generateurCapacity,maisonName,maisonConsommation
+"generateur(g1,100).\nmaison(m1,BASSE).\nconnexion(m1,g1).",50.0,1,1,g1,100,m1,BASSE
+"generateur(g2,200).\ngenerateur(g3,150).\nmaison(m2,FORTE).\nconnexion(m2,g2).",75.0,2,1,g2,200,m2,FORTE

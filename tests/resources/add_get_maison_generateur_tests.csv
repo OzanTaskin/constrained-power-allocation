@@ -1,0 +1,3 @@
+maisonName,generateurName,shouldMaisonExist,shouldGenerateurExist
+m1,g1,true,true
+m-nonexistent,g-nonexistent,false,false
