@@ -88,30 +88,27 @@ Le coût total d'une configuration est calculé pour évaluer sa performance, en
 
 ---
 
-# Algorithme d’optimisation (`reseau.Optimisation`)
-
-Ce document présente, de manière académique et vérifiable, l’algorithme implémenté dans `reseau.Optimisation` :
-construction initiale gloutonne (MRV), recuit simulé adaptatif, descente locale, puis recherche locale itérée (ILS).
+# Algorithme d'optimisation (`reseau.Optimisation`)
 
 ---
 
 ## 1. Formulation du problème et catégorie
 
-On traite un problème d’affectation : attribuer chaque maison à un générateur afin de minimiser un coût global.
+On traite un problème d'affectation / allocation : attribuer chaque maison à un générateur afin de minimiser un coût global.
 
-Le problème relève de l’optimisation combinatoire et se rapproche de :
+Le problème relève de l'optimisation combinatoire et se rapproche de :
 - load balancing (répartition de charge),
 - partitionnement / bin packing (NP-difficile en général),
 - affectation sous contraintes avec pénalisation des violations (surcharge).
 
-Si |M| est le nombre de maisons et |G| le nombre de générateurs, l’espace des affectations est de l’ordre de |G|^|M|. Une recherche exhaustive n’est donc pas réaliste ; le projet s’appuie sur des métaheuristiques.
+Si |M| est le nombre de maisons et |G| le nombre de générateurs, l'espace des affectations est de l'ordre de |G|^|M|. Une recherche exhaustive n'est donc pas réaliste dans notre cas ; le projet s'appuie sur des métaheuristiques.
 
 ---
 
 ## 2. Fonction objectif (code : `Reseau.calculCout()`)
 
 Pour chaque générateur g :
-- taux d’utilisation : u_g = chargeActuelle_g / capacite_g
+- taux d'utilisation : u_g = chargeActuelle_g / capacite_g
 
 Le coût total est défini par :
 ```text
@@ -120,13 +117,13 @@ surcharge  = Σ_g max(0, u_g - 1)
 cout       = dispersion + (penalite * surcharge)
 ```
 
-Interprétation :
-- la dispersion favorise un équilibrage des taux d’utilisation ;
+
+- la dispersion favorise un équilibrage des taux d'utilisation ;
 - la pénalité rend les surcharges structurellement défavorables.
 
 ---
 
-## 3. Vue d’ensemble de l’algorithme (pseudo-code)
+## 3. Vue d'ensemble de l'algorithme (pseudo-code)
 
 Le plan ci-dessous correspond directement à `Optimisation.optimiser(reseau)`.
 
@@ -138,7 +135,7 @@ optimiser(reseau):
     bestSol  ← connexions(reseau)
     bestCost ← cout(reseau)
 
-    D) pour restart de 2 à NB_RESTARTS:
+    D) pour restart de 1 à NB_RESTARTS - 1:
            restaurerSolution(bestSol, reseau)
            perturbationForte(reseau, p)
            recuitSimuleAdaptatif(reseau)
@@ -151,19 +148,89 @@ optimiser(reseau):
     return bestCost
 ```
 
+**Paramètres utilisés :**
+- `NB_RESTARTS = 5` (**nombre total de cycles** : 1 cycle initial + `NB_RESTARTS - 1` itérations ILS)
+
+
+- `TEMPERATURE_INITIALE = 1000.0`
+
+
+- `TEMPERATURE_MIN = 0.001`
+
+
+- `MAX_ITERATIONS_RECUIT = 50000` (limite de sécurité)
+
+
+- `MAX_ITERATIONS_DESCENTE = 1000`
+
+
+- `TAILLE_FENETRE_ADAPTATION = 100` (adaptation du refroidissement)
+
+
+- `SEUIL_RECHAUFFE = 800` (stagnation avant réchauffe)
+
+
+- `MAX_RECHAUFFES = 3` (nombre maximal de réchauffes)
+
+
+- `PROPORTION_PERTURBATION = 0.3` (30% des maisons perturbées)
+
+
+- `PROBABILITE_SWAP = 0.3` (30% de swaps vs 70% de déplacements)
+
 ---
 
-## 4. Étape A — Construction initiale (glouton MRV)
+## 4. Étape A — Construction initiale gloutonne (tri des maisons par consommation décroissante)
 
 Méthode : `construireSolutionInitiale(reseau)`
 
-- Tri des maisons par consommation décroissante (priorité aux éléments les plus contraignants).
-- Affectation de chaque maison au générateur maximisant un score (méthode `trouverMeilleurGenerateur`) :
-  - bonus si capacité restante élevée,
-  - bonus si générateur sous-utilisé,
-  - pénalisation forte si la maison ne peut pas être accueillie.
+### 4.1 Principe de l'heuristique
 
-Objectif : fournir un point de départ complet et raisonnable pour la métaheuristique.
+La construction initiale repose sur une heuristique gloutonne de priorisation :
+- Les maisons sont triées par consommation **décroissante**
+- Les maisons à forte consommation (plus difficiles à placer) sont affectées en premier
+
+
+### 4.2 Algorithme
+
+```text
+construireSolutionInitiale(reseau):
+    maisons ← liste(reseau.getMaisons())
+    trier(maisons, PAR consommation, ORDRE décroissant)
+
+    // Réinitialiser connexions existantes
+    pour chaque (maison, generateur) dans connexions:
+        si generateur ≠ null:
+            supprConnexion(maison, generateur)
+
+    // Affectation gloutonne
+    pour chaque maison m dans maisons:
+        g_optimal ← trouverMeilleurGenerateur(m, reseau)
+        si g_optimal ≠ null:
+            addConnexion(m, g_optimal)
+```
+
+### 4.3 Fonction de score (méthode `trouverMeilleurGenerateur`)
+
+Pour chaque générateur candidat g, le score est calculé ainsi :
+
+```text
+capaciteRestante ← g.capacite - g.chargeActuelle
+taux ← g.chargeActuelle / g.capacite
+score ← capaciteRestante × (1.0 - taux)
+
+si capaciteRestante < m.consommation:
+    score ← score - 100000  // pénalité massive
+```
+
+**Interprétation :**
+- Favorise les générateurs avec beaucoup de capacité restante
+- Bonus pour les générateurs sous-utilisés (taux faible)
+- Pénalité forte (mais pas interdiction absolue) en cas de risque de surcharge
+
+Le générateur ayant le meilleur score est sélectionné.
+
+**Objectif :** Fournir un point de départ complet et raisonnable pour la métaheuristique (éviter de démarrer d'une solution aléatoire de mauvaise qualité).
 
 ---
 
@@ -171,42 +238,158 @@ Objectif : fournir un point de départ complet et raisonnable pour la métaheuri
 
 ### 5.1 Voisinage (mouvements)
 
-À chaque itération :
-- déplacement : m passe de g1 vers g2 (`tentativeDeplacement`) ;
-- swap : échange des générateurs de deux maisons (`tentativeSwap`, probabilité `PROBABILITE_SWAP`).
+À chaque itération, l'algorithme choisit aléatoirement un type de mouvement :
 
-Le swap élargit le voisinage et facilite des transitions difficiles via déplacements simples.
+**A) Déplacement simple (70% du temps) :** `tentativeDeplacement`
+- Sélectionne une maison m (via heuristique cf 5.2)
+- Sélectionne un générateur cible g' (via heuristique cf 5.2)
+- Applique : m passe de son générateur actuel à g'
 
-### 5.2 Règle d’acceptation (Metropolis)
+**B) Swap (30% du temps) :** `tentativeSwap`
+- Sélectionne deux maisons `m1` et `m2` au hasard
+- Récupère leurs générateurs actuels `g1` et `g2`
+- **Préconditions (sinon le mouvement est rejeté) :**
+    - `maisons.size()` > = 2
+    - `g1` et `g2` ne sont pas `null`
+    - `g1 ≠ g2`
+- Si valide, échange les générateurs : `m1 → g2` et `m2 → g1`
 
-Si Δ = cout_apres - cout_avant :
-- si Δ < 0 : le mouvement est accepté ;
-- sinon : il est accepté avec probabilité exp(-Δ / T).
+**Pourquoi le swap ?** Le mouvement swap permet d'explorer des transitions impossibles via des déplacements simples.
 
-### 5.3 Refroidissement adaptatif (par fenêtres)
+### 5.2 Sélection intelligente des maisons (méthode `choisirMaisonIntelligente`)
 
-Toutes les `TAILLE_FENETRE_ADAPTATION` itérations, la vitesse de refroidissement est ajustée selon le taux d’acceptation observé.
+Au lieu de choisir purement aléatoirement, l'algorithme identifie les maisons "prioritaires" :
 
-### 5.4 Réchauffe (reheating)
+```text
+candidatsPrioritaires ← []
+tauxMoyen ← reseau.getTauxUtilisationMoyen()
 
-Le code applique la règle suivante :
-```java
-temperature = Math.min(temperature * 15, TEMPERATURE_INITIALE * 0.4);
+pour chaque maison m:
+    g ← générateur actuel de m
+    taux_g ← g.calculTauxUtilisation()
+
+    si |taux_g - tauxMoyen| > 0.15 OU taux_g > 1.0:
+        ajouter m à candidatsPrioritaires
+
+// 70% : choisir parmi prioritaires, 30% : aléatoire pur
+si candidatsPrioritaires non vide ET random() < 0.7:
+    retourner choix aléatoire dans candidatsPrioritaires
+sinon:
+    retourner choix aléatoire dans toutes les maisons
 ```
 
-Cette règle ramène la température vers un plafond 0.4·T0 :
-- si T < 0.4·T0, la réchauffe augmente T (jusqu’au plafond) ;
-- si T > 0.4·T0, la réchauffe diminue T (retour au plafond).
+**Intuition :** Concentrer les efforts sur les maisons connectées à des générateurs déséquilibrés ou surchargés (principe de Pareto : 80% de l'amélioration vient de 20% des changements).
 
-![Évolution de la température](assets/images/sa_temperature_reheats.png)
+### 5.3 Sélection intelligente des générateurs (méthode `choisirGenerateurIntelligent`)
 
-### 5.5 Minima locaux et optimum global (intuition)
+Pour une maison m à déplacer, chaque générateur g reçoit un score :
 
-Le recuit peut stagner dans un minimum local. Grâce à la température (acceptations probabilistes) et au mécanisme de réchauffe, il peut accepter temporairement des dégradations et sortir du bassin local, puis converger vers une région meilleure.
+```text
+score ← -|taux_g - tauxMoyen|  // privilégie proximité au taux moyen
 
-![Minimum local et optimum global](assets/images/sa_local_global_landscape_clear.png)
+si taux_g < tauxMoyen:
+    score ← score + 0.5  // bonus sous-utilisation
 
-Note : sur la figure, les flèches noires représentent la trajectoire ; les flèches d’annotation (minimum local / optimum global) sont distinctes.
+si charge_g + conso_m > capacite_g:
+    score ← score - 10.0  // pénalité surcharge
+```
+
+Les générateurs sont triés par score décroissant, puis :
+- 80% du temps : sélection aléatoire parmi les 3 meilleurs (diversification contrôlée)
+- 20% du temps : sélection complètement aléatoire (diversification forte)
+
+### 5.4 Règle d'acceptation (Critère de Metropolis)
+
+Pour un mouvement donné, le coût change de Δ = cout_apres - cout_avant.
+
+**Règle d'acceptation :**
+```text
+si Δ < 0:
+    accepter le mouvement  // amélioration stricte
+sinon:
+    accepter avec probabilité P = exp(-Δ / T)
+```
+
+où `T` est la température courante.
+
+**Interprétation physique :** Cette règle est issue de la distribution de Boltzmann en physique statistique. Elle permet d'accepter probabilistiquement des dégradations temporaires pour échapper aux minima locaux.
+
+### 5.5 Refroidissement adaptatif (par fenêtres)
+
+Le recuit est structuré en **fenêtres** de taille `TAILLE_FENETRE_ADAPTATION = 100`.  
+Pendant une fenêtre, la température `T` peut être ajustée en cours de fenêtre par un mécanisme de réchauffe en cas de stagnation.  
+De plus, à la fin de chaque fenêtre, `T` est mise à jour **une seule fois** en fonction du **taux d’acceptation des mouvements** sur la fenêtre :
+
+- `acceptationsFenetre` = nombre de mouvements **acceptés** (Δ<0 ou acceptés par Metropolis),
+- `tauxAcceptation = acceptationsFenetre / W (W =100)`.
+
+```text
+tauxAcceptation ← acceptationsFenetre / W (W = 100)
+
+si tauxAcceptation > 0.85:
+    T ← T × 0.95
+sinon si tauxAcceptation < 0.15:
+    T ← T × 0.985
+sinon:
+    T ← T × 0.97
+```
+
+**Objectif :** Adapter dynamiquement la vitesse de refroidissement selon le comportement observé, sans réglage manuel fastidieux (trop d'accepttation -> refroidir plus vite ; trop peu -> refroidir plus lentement)
+
+### 5.6 Mécanisme de réchauffe (reheating)
+
+
+**Condition de déclenchement :** (stagnation strictement supérieure au seuil)
+
+```java
+if (iterationsSansAmelioration > SEUIL_RECHAUFFE && nombreRechauffes < MAX_RECHAUFFES) {
+temperature = Math.min(temperature * 15.0, TEMPERATURE_INITIALE * 0.4);
+iterationsSansAmelioration = 0;
+nombreRechauffes++;
+        }
+```        
+
+**Interprétation :**
+- Si aucune amélioration depuis plus de `SEUIL_RECHAUFFE = 800` itérations → stagnation détectée
+- Réchauffe appliquée : `T ← min(15 × T, 0.4 × T0)` avec `T0 = TEMPERATURE_INITIALE`
+- Effet :
+    - si `T < 0.4 × T0`, alors `T` augmente (jusqu’au plafond),
+    - si `T ≥ 0.4 × T0`, alors `T` est fixé au plafond `0.4 × T0` (ce qui peut donc diminuer `T`)
+    - Limité à `MAX_RECHAUFFES = 3` réchauffes par phase de recuit
+
+
+- **Objectif :** Sortir d'un bassin d'attraction en réaugmentant temporairement la probabilité d'accepter des dégradations, permettant ainsi de franchir des barrières énergétiques et d'explorer de nouveaux bassins.
+
+
+![Évolution de la température](assets/img/sa_temperature_reheats.png)
+
+**Figure 1 : Évolution de la température avec plafonnement et “réchauffes” (R1, R2)**  
+Ce graphique montre l’évolution de la température `T` (échelle logarithmique) au cours des itérations du recuit simulé. La température décroît par paliers car elle est principalement mise à jour à la fin de fenêtres de 100 itérations (refroidissement adaptatif).
+
+Lorsqu’une stagnation est détectée, un mécanisme de “réchauffe” peut également modifier `T` *au cours d’une fenêtre* via la règle suivante :
+
+`T = min(15 * T, 0.4 * T0)`
+
+où `T0` est la température initiale. Cette règle ramène `T` vers un plafond fixé à `0.4 * T0 = 400` (ligne pointillée). Selon la valeur de `T` au moment du déclenchement, l’événement peut :
+- **augmenter** `T` jusqu’au plafond (cas illustré par R2 vers ~1600 itérations), ou
+- **ramener** `T` au plafond si `T` était encore au-dessus (cas illustré par R1 vers ~250 itérations).
+
+Dans les deux cas, l’objectif est de relancer l’exploration en modifiant brutalement le niveau d’acceptation des mouvements.
+
+### 5.7 Minima locaux et optimum global (intuition)
+
+Le recuit simulé peut stagner dans un minimum local. Grâce à la température (acceptations probabilistes) et au mécanisme de réchauffe, il peut accepter temporairement des dégradations et sortir du bassin local, puis converger vers une région meilleure.
+
+![Minimum local et optimum global](assets/img/recuit_sim.png)
+
+**Figure 2 : Trajectoire du recuit simulé dans le paysage d'optimisation**  
+Ce graphique illustre conceptuellement le parcours de l'algorithme dans l'espace des solutions (axe X) avec le coût associé (axe Y). La courbe bleue représente le "paysage énergétique" avec plusieurs vallées (optima locaux). La trajectoire orange montre comment le recuit :
+1. Descend vers un premier optimum local (vallée de gauche, coût ~1.3)
+2. Accepte des dégradations temporaires grâce à la température (remontées vers coût ~2.2)
+3. Franchit la barrière et descend vers un deuxième optimum local (coût ~0.8)
+4. Continue à explorer et finit par atteindre l'optimum global (vallée de droite, coût ~0.1 marqué par un cercle rouge)
+
+Les flèches noires indiquent la progression de la recherche. Sans acceptation probabiliste de dégradations, l'algorithme resterait piégé dans le premier minimum local.
 
 ---
 
@@ -214,33 +397,134 @@ Note : sur la figure, les flèches noires représentent la trajectoire ; les fl�
 
 Méthode : `descenteLocale(reseau)`
 
-- Parcours des maisons dans un ordre aléatoire.
-- Pour chaque maison, essai de plusieurs générateurs cibles.
-- Acceptation uniquement si le coût diminue strictement (Δ < 0).
-- Sinon, annulation du mouvement (rollback) pour revenir à l’affectation précédente.
+### 6.1 Algorithme
 
-Rôle : phase de finalisation (“polissage”) qui converge vers un optimum local.
+```text
+descenteLocale(reseau):
+    amelioration ← vrai
+    iterations ← 0
+
+    tant que amelioration ET iterations < MAX_ITERATIONS_DESCENTE:
+        amelioration ← faux
+        iterations ← iterations + 1
+
+        maisons ← melanger(liste des maisons)
+
+        pour chaque maison m dans maisons:
+            g_actuel ← générateur actuel de m
+            generateurs ← melanger(liste des générateurs)
+
+            pour chaque g_nouveau dans generateurs:
+                si g_actuel = g_nouveau: continuer
+
+                coutAvant ← reseau.getCout()
+                changeConnexion(m, g_actuel, g_nouveau)
+                reseau.calculCout()
+                coutApres ← reseau.getCout()
+
+                si coutApres < coutAvant:
+                    amelioration ← vrai
+                    g_actuel ← g_nouveau  // garder le changement
+                sinon:
+                    // Rollback
+                    changeConnexion(m, g_nouveau, g_actuel)
+                    reseau.calculCout()
+```
+
+### 6.2 Différence avec le recuit
+
+**Différences clés :**
+- **Aucune acceptation probabiliste** : seules les améliorations strictes (Δ < 0) sont acceptées
+- **Pas de température** : comportement purement déterministe (à ordre de parcours aléatoire près)
+- **Convergence garantie** : s'arrête nécessairement sur un optimum local
+
+**Rôle :** Phase de finalisation ("polissage") qui converge vers le fond exact du bassin d'attraction exploré par le recuit.
 
 ---
 
-## 7. Étape D — Recherche locale itérée (ILS) : redémarrages et perturbation
+## 7. Étape D — Recherche locale itérée (ILS) : perturbations et redémarrages
 
-### 7.1 Perturbation forte
+### 7.1 Principe d'ILS
 
-Méthode : `perturbationForte(reseau, PROPORTION_PERTURBATION)`
+Au lieu de relancer l'optimisation depuis zéro (multi-start), ILS applique le schéma suivant :
+1. Partir de la meilleure solution connue
+2. Appliquer une **perturbation contrôlée** (ni trop faible, ni trop forte)
+3. Réoptimiser (recuit + descente)
+4. Conserver si meilleur que le best-so-far, sinon rejeter
 
-Principe :
-- mélanger la liste des maisons ;
-- sélectionner k = max(1, floor(p · |M|)) maisons, avec p = `PROPORTION_PERTURBATION` ;
-- pour chacune, choisir un générateur différent au hasard et appliquer `changeConnexion`.
+**Avantages sur multi-start pur :**
+- Conserve une partie de la structure de la bonne solution
+- Explore d'autres bassins d'attraction sans perdre complètement l'information acquise
+- Plus efficace pour des problèmes structurés
 
-But : introduire une dégradation contrôlée afin d’explorer une autre région de l’espace des solutions.
+### 7.2 Perturbation forte (méthode `perturbationForte`)
 
-### 7.2 Logique ILS et conservation du meilleur
+```text
+perturbationForte(reseau, proportion):
+    maisons ← melanger(liste des maisons)
+    generateurs ← liste des générateurs
 
-Après la perturbation, l’algorithme relance recuit simulé puis descente locale. La meilleure solution globale (best-so-far) est conservée sur l’ensemble des restarts.
+    k ← max(1, floor(proportion × |maisons|))
 
-![ILS : synthèse par restart](assets/images/ils_phases_report.png)
+    pour i de 0 à k-1:
+        m ← maisons[i]
+        g_actuel ← générateur actuel de m
+
+        autresGenerateurs ← generateurs \ {g_actuel}
+
+        si autresGenerateurs non vide:
+            g_nouveau ← choix aléatoire dans autresGenerateurs
+            changeConnexion(m, g_actuel, g_nouveau)
+
+    reseau.calculCout()
+```
+
+**Avec `PROPORTION_PERTURBATION = 0.3` :**
+- 30% des maisons sont déplacées aléatoirement
+- Force suffisante pour sortir du bassin d'attraction actuel
+- Pas trop forte pour conserver une partie de la structure
+
+**Pourquoi 30% ?** C'est un compromis empirique documenté dans la littérature ILS :
+- Trop faible (< 10%) : risque de rester dans le même bassin
+- Trop forte (> 50%) : perte excessive d'information, comportement proche d'un restart pur
+
+### 7.3 Boucle ILS et critère d'acceptation
+
+```text
+// Après initialisation et première optimisation
+bestSol ← connexions(reseau)
+bestCost ← cout(reseau)
+
+pour restart de 1 à NB_RESTARTS - 1:
+    // 1) Restaurer meilleure solution
+    restaurerSolution(bestSol, reseau)
+
+    // 2) Perturber
+    perturbationForte(reseau, 0.3)
+
+    // 3) Réoptimiser
+    recuitSimuleAdaptatif(reseau)
+    descenteLocale(reseau)
+
+    // 4) Critère d'acceptation élitiste
+    si cout(reseau) < bestCost:
+        bestCost ← cout(reseau)
+        bestSol ← connexions(reseau)
+```
+
+**Critère d'acceptation :** Élitiste strict (on ne conserve que si amélioration). Alternative possible : critère de Metropolis avec température propre à ILS (non implémenté ici).
+
+![ILS : synthèse par restart](assets/img/ils.png)
+
+**Figure 3 : Un cycle complet d'ILS (Perturbation → Recuit → Descente)**  
+Ce graphique montre un cycle typique d'ILS dans le paysage d'optimisation (courbe bleue claire). L'algorithme :
+1. Part d'un optimum local (Optimum 1, cercle bleu en vallée gauche)
+2. **Perturbation** (flèche orange) : déplacement brutal de 30% des maisons, ce qui "éjecte" la solution de son bassin vers une autre région
+3. **Recuit simulé** (ligne rouge avec points orange) : exploration avec acceptation probabiliste, descente progressive avec quelques remontées
+4. **Descente locale** (ligne verte) : convergence déterministe vers le fond de la nouvelle vallée
+5. Résultat : nouvel optimum local (Optimum 2, cercle bleu en vallée droite) qui est meilleur que le précédent
+
+Ce cycle est répété 4 fois (`NB_RESTARTS - 1 (Initial) = 4`) dans l'algorithme, en conservant toujours la meilleure solution globale rencontrée.
 
 ---
 
@@ -248,43 +532,122 @@ Après la perturbation, l’algorithme relance recuit simulé puis descente loca
 
 Notations : |M| = nombre de maisons, |G| = nombre de générateurs.
 
-Construction initiale :
-- tri : O(|M| log |M|)
-- choix générateur : O(|M|·|G|)
-Total : O(|M| log |M| + |M|·|G|)
+### 8.1 Construction initiale
 
-Recuit simulé :
-- chaque itération déclenche un mouvement et un `calculCout()` parcourant les générateurs : O(|G|)
-Si I_SA est le nombre d’itérations effectives :
-Total : O(I_SA · |G|), avec une borne via `MAX_ITERATIONS_RECUIT`.
+- Tri : O(|M| log |M|)
+- Choix générateur pour chaque maison : O(|M|·|G|)
 
-Descente locale :
-- essais de déplacements (maison, générateur) et recalculs de coût O(|G|) par tentative
-Si I_DL est le nombre d’itérations externes :
-Total (pire cas) : O(I_DL · |M| · |G|^2), borné par `MAX_ITERATIONS_DESCENTE`.
+**Total :** O(|M| log |M| + |M|·|G|)
 
-ILS :
-- répète (perturbation + recuit + descente) `NB_RESTARTS` fois
-Total (ordre de grandeur) :
-O( NB_RESTARTS · (I_SA·|G| + I_DL·|M|·|G|^2) ) + coût de construction initiale.
+### 8.2 Recuit simulé
+
+Chaque itération :
+- Un mouvement (déplacement ou swap) : O(1)
+- Recalcul complet du coût (`calculCout()`) : O(|G|)
+
+Si I_SA est le nombre d'itérations effectives (borné par `MAX_ITERATIONS_RECUIT = 50000`) :
+
+**Total :** O(I_SA · |G|)
+
+**Remarque :** Le recalcul complet du coût à chaque itération est coûteux. Une optimisation possible serait un calcul incrémental du delta (Δ-cost local), mais ce n'est pas implémenté ici.
+
+### 8.3 Descente locale
+
+Chaque itération externe :
+- Parcourt toutes les maisons : O(|M|)
+- Pour chaque maison, teste tous les générateurs : O(|G|)
+- Chaque test déclenche un recalcul de coût : O(|G|)
+
+Si I_DL est le nombre d'itérations externes (borné par `MAX_ITERATIONS_DESCENTE = 1000`) :
+
+**Total (pire cas) :** O(I_DL · |M| · |G|²)
+
+En pratique, la convergence est rapide (5-10 itérations typiquement car peu d'améliorations restent).
+
+### 8.4 ILS complet
+
+ILS répète `NB_RESTARTS = 4` fois : (perturbation + recuit + descente)
+- Perturbation : O(|M|) (parcours + affectations)
+- Recuit : O(I_SA · |G|)
+- Descente : O(I_DL · |M| · |G|²)
+
+**Total (ordre de grandeur) :**
+
+O(NB_RESTARTS · (I_SA·|G| + I_DL·|M|·|G|²)) + O(|M| log |M| + |M|·|G|)
+
+Avec les valeurs typiques (|M| = 100, |G| = 10, I_SA ≈ 10000, I_DL ≈ 10) :
+- Construction : ~1000 opérations
+- Recuit par phase : ~100 000 opérations
+- Descente par phase : ~100 000 opérations
+- ILS (5 restarts) : ~1 000 000 opérations
+
 
 ---
 
-## 9. Références
+## 9.2 Pourquoi cet algorithme est adapté au problème
 
-1. S. Kirkpatrick, C. D. Gelatt, M. P. Vecchi, “Optimization by Simulated Annealing”, Science, 1983.
-2. E. Aarts, J. Korst, Simulated Annealing and Boltzmann Machines, Wiley, 1988.
-3. H. R. Lourenço, O. C. Martin, T. Stützle, “Iterated Local Search”, Handbook of Metaheuristics (2e éd.), 2010.
-4. E.-G. Talbi, Metaheuristics: From Design to Implementation, Wiley, 2009.
+**Nature du paysage de recherche :**
+- Multimodalité (nombreux optima locaux)
+- Plateaux (zones où nombreuses solutions ont coût similaire)
+- Forte non-linéarité (composante dispersion + discontinuités surcharges)
+
+→ ILS + Recuit simulé sont particulièrement efficaces sur ces caractéristiques
+
+**Structure des contraintes :**
+- Contraintes souples (dispersion) : gérées par fonction objectif
+- Contraintes dures (capacité totale) : gérées par construction
+- Contraintes hybrides (surcharges individuelles) : pénalité λ
+
+→ Approche métaheuristique plus adaptée que PLNE pour contraintes mixtes
+
+**Taille des instances :**
+- Trop grand pour énumération exhaustive (|G|^|M| possibilités)
+- Trop petit pour métaheuristiques populationnelles lourdes (AG, PSO)
+- Idéal pour recherches locales itérées
+
+
+
+## 10. Références
+
+### 10.1 Articles fondateurs
+
+1. **S. Kirkpatrick, C. D. Gelatt, M. P. Vecchi (1983)**  
+   "Optimization by Simulated Annealing"  
+   *Science*, 220(4598), 671-680.  
+   (Article fondateur du recuit simulé, analogie avec le recuit métallurgique)
+
+2. **N. Metropolis, A. W. Rosenbluth, M. N. Rosenbluth, A. H. Teller, E. Teller (1953)**  
+   "Equation of State Calculations by Fast Computing Machines"  
+   *The Journal of Chemical Physics*, 21(6), 1087-1092.  
+   (Critère de Metropolis, base du recuit simulé)
+
+3. **H. R. Lourenço, O. C. Martin, T. Stützle (2010)**  
+   "Iterated Local Search"  
+   *Handbook of Metaheuristics* (2nd edition), Springer, 320-353.  
+   (Référence principale pour ILS, perturbations + critères d'acceptation)
+
+### 10.2 Ouvrages de référence
+
+4. **E. Aarts, J. Korst (1988)**  
+   *Simulated Annealing and Boltzmann Machines*  
+   Wiley.  
+   (Analyse théorique du recuit, schedules de refroidissement)
+
+5. **E.-G. Talbi (2009)**  
+   *Metaheuristics: From Design to Implementation*  
+   Wiley.  
+   (Vue d'ensemble des métaheuristiques, comparaisons, choix algorithmiques)
+
+6. **S. Russell, P. Norvig (2020)**  
+   *Artificial Intelligence: A Modern Approach* (4th edition)  
+   Pearson, Chapter 6: Constraint Satisfaction Problems.  
+   (Heuristique MRV, variable ordering dans les CSP)
+
+### 10.3 Articles spécialisés
+
+7. **P. Salamon, P. Sibani, R. Frost (2010)**  
+   "Investigation of Acceptance Simulated Annealing — A Simplified Approach to Adaptive Cooling Schedules"  
+   *European Physical Journal B*, 76(4), 447-453.  
+   (Schedules adaptatifs basés sur le taux d'acceptation)
 
 ---
-
-## 10. Ouverture : résolution par solveur SAT / Max-SAT / SMT
-
-Le problème peut également être formulé pour un solveur :
-- variables booléennes x_(m,g) indiquant l’affectation (chaque maison affectée à un unique générateur) ;
-- contraintes d’unicité et de structure ;
-- gestion des surcharges via des contraintes supplémentaires ou une formulation d’optimisation (Max-SAT) ;
-- optimisation du coût (ou d’une approximation linéarisée) via Max-SAT/SMT.
-
-Une telle approche fournit des garanties (optimalité sous hypothèses, certificats) mais peut devenir coûteuse sur de grandes instances ; l’approche métaheuristique reste adaptée pour obtenir rapidement de bonnes solutions.

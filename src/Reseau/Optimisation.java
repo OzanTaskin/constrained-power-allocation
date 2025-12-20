@@ -1,153 +1,118 @@
 package reseau;
 
-import UI.view.TerminalView;
-
 import java.util.*;
-import java.util.concurrent.*;
 
 /**
  * Optimisation avancée du réseau électrique par algorithme hybride.
- * <p>
- * Combine plusieurs techniques d'optimisation de pointe :
- * <ul>
- * <li>Construction gloutonne avec heuristique MRV</li>
- * <li>Recherche Locale Itérée (ILS) avec perturbations</li>
- * <li>Recuit simulé adaptatif avec réchauffe automatique</li>
- * <li>Mouvements complexes (déplacement + swap)</li>
- * <li>Descente locale pour convergence finale</li>
- * </ul>
  *
- * @author Votre nom
- * @version 2.1 - Optimisations avancées + corrections
+ * Pipeline :
+ *  - Construction gloutonne (tri décroissant des consommations)
+ *  - Recuit simulé adaptatif (fenêtres + reheating)
+ *  - Descente locale (améliorations strictes)
+ *  - ILS : perturbation + (recuit + descente), best-so-far
  */
 public class Optimisation {
 
     private static final int NB_RESTARTS = 5;
+
     private static final double TEMPERATURE_INITIALE = 1000.0;
     private static final double TEMPERATURE_MIN = 0.001;
-    private static final int MAX_ITERATIONS_RECUIT = 50000; // Limite de sécurité
+
+    private static final int MAX_ITERATIONS_RECUIT = 50_000;   // limite de sécurité
     private static final int MAX_ITERATIONS_DESCENTE = 1000;
+
+    // Fenêtre d'adaptation : on fixe T, on fait W itérations, puis on ajuste T une seule fois.
     private static final int TAILLE_FENETRE_ADAPTATION = 100;
+
     private static final int SEUIL_RECHAUFFE = 800;
-    private static final int MAX_RECHAUFFES = 3; // Limite le nombre de réchauffes
+    private static final int MAX_RECHAUFFES = 3;
+
     private static final double PROPORTION_PERTURBATION = 0.3;
     private static final double PROBABILITE_SWAP = 0.3;
 
-    private static Random random = new Random();
+    private static final Random random = new Random();
 
-    /**
-     * Optimise la distribution électrique par Recherche Locale Itérée.
-     * <p>
-     * Utilise ILS (Iterated Local Search) : au lieu de restarts indépendants,
-     * perturbe la meilleure solution trouvée pour explorer de nouvelles régions
-     * tout en conservant les bonnes structures découvertes.
-     *
-     * @param reseau le réseau à optimiser
-     * @return le coût final de la meilleure solution trouvée
-     */
     public static double optimiser(Reseau reseau) {
-        System.out.println("\n=== RESOLUTION AUTOMATIQUE AVANCEE V2.0 ===");
-        System.out.println("Algorithme : ILS + Recuit Adaptatif + Reheating + Mouvements Complexes\n");
-
+        System.out.println("\n=== RESOLUTION AUTOMATIQUE (ILS + Recuit + Descente) ===\n");
         long debutTotal = System.currentTimeMillis();
 
-        // Solution initiale
-        System.out.println("--- Initialisation ---");
+        // A) Solution initiale
         construireSolutionInitiale(reseau);
-        System.out.println("Construction initiale terminée");
+        reseau.calculCout();
 
+        // B) Première optimisation
         recuitSimuleAdaptatif(reseau);
         descenteLocale(reseau);
         reseau.calculCout();
 
         double meilleurCoutGlobal = reseau.getCout();
         Map<Maison, Generateur> meilleureSolutionGlobale = new HashMap<>(reseau.getConnexions());
-        System.out.printf("Solution initiale optimisée : %.3f%n%n", meilleurCoutGlobal);
+        System.out.printf("Solution initiale optimisée : %.6f%n%n", meilleurCoutGlobal);
 
-        // ILS : Perturbation + Optimisation itérées
+        // D) ILS : perturbation + ré-optimisation
         for (int restart = 1; restart < NB_RESTARTS; restart++) {
-            System.out.printf("--- ILS Itération %d/%d ---%n", restart + 1, NB_RESTARTS);
+            System.out.printf("--- ILS itération %d/%d ---%n", restart + 1, NB_RESTARTS);
 
-            // Restaure la meilleure solution et la perturbe
             restaurerSolution(meilleureSolutionGlobale, reseau);
             perturbationForte(reseau, PROPORTION_PERTURBATION);
-            double coutApresPerturbation = reseau.getCout();
-            System.out.printf("Après perturbation : %.3f%n", coutApresPerturbation);
+            System.out.printf("Après perturbation : %.6f%n", reseau.getCout());
 
-            // Réoptimise
             recuitSimuleAdaptatif(reseau);
-            reseau.calculCout();
-            double coutApresRecuit = reseau.getCout();
-            System.out.printf("Après recuit       : %.3f%n", coutApresRecuit);
+            System.out.printf("Après recuit       : %.6f%n", reseau.getCout());
 
             descenteLocale(reseau);
             reseau.calculCout();
             double coutFinal = reseau.getCout();
-            System.out.printf("Après descente     : %.3f%n", coutFinal);
+            System.out.printf("Après descente     : %.6f%n", coutFinal);
 
-            // Critère d'acceptation ILS
             if (coutFinal < meilleurCoutGlobal) {
                 meilleurCoutGlobal = coutFinal;
                 meilleureSolutionGlobale = new HashMap<>(reseau.getConnexions());
-                System.out.println("✓ Nouvelle meilleure solution !");
+                System.out.println("Nouvelle meilleure solution.");
             } else {
-                System.out.println("✗ Pas d'amélioration, retour à la meilleure");
+                System.out.println("Pas d'amélioration, retour à la meilleure.");
             }
             System.out.println();
         }
 
+        // Restaurer best-so-far
         restaurerSolution(meilleureSolutionGlobale, reseau);
         reseau.calculCout();
 
         long tempsTotal = System.currentTimeMillis() - debutTotal;
-
         System.out.println("=== RESULTAT FINAL ===");
-        System.out.printf("Meilleur coût trouvé : %.3f%n", meilleurCoutGlobal);
-        System.out.printf("Temps total          : %dms%n", tempsTotal);
-        System.out.println();
+        System.out.printf("Meilleur coût trouvé : %.6f%n", meilleurCoutGlobal);
+        System.out.printf("Temps total          : %d ms%n%n", tempsTotal);
 
         return meilleurCoutGlobal;
     }
 
     /**
-     * Construit une solution initiale par distribution gloutonne.
-     * <p>
-     * Trie les maisons par consommation décroissante (heuristique MRV)
-     * et assigne chaque maison au générateur minimisant le déséquilibre.
-     *
-     * @param reseau le réseau à initialiser
+     * Construction initiale gloutonne : maisons triées par consommation décroissante,
+     * puis affectation au générateur maximisant un score (capacité restante, sous-utilisation, pénalité surcharge).
      */
     private static void construireSolutionInitiale(Reseau reseau) {
         List<Maison> maisons = new ArrayList<>(reseau.getMaisons());
         maisons.sort((m1, m2) -> Integer.compare(m2.getConsommation(), m1.getConsommation()));
 
-        // Réinitialiser toutes les connexions
-        Map<Maison, Generateur> connexionsCopie = new HashMap<>(reseau.getConnexions());
-        for (Map.Entry<Maison, Generateur> entry : connexionsCopie.entrySet()) {
-            if (entry.getValue() != null) {
-                reseau.supprConnexion(entry.getKey(), entry.getValue());
+        // Supprime toutes les connexions existantes
+        Map<Maison, Generateur> copie = new HashMap<>(reseau.getConnexions());
+        for (Map.Entry<Maison, Generateur> e : copie.entrySet()) {
+            if (e.getValue() != null) {
+                reseau.supprConnexion(e.getKey(), e.getValue());
             }
         }
 
-        // Distribuer toutes les maisons
+        // Assigne toutes les maisons
         for (Maison m : maisons) {
             Generateur meilleur = trouverMeilleurGenerateur(m, reseau);
             if (meilleur != null) {
                 reseau.addConnexion(m, meilleur);
             }
         }
+        reseau.calculCout();
     }
 
-    /**
-     * Sélectionne le générateur optimal pour une maison donnée.
-     * <p>
-     * Calcule un score privilégiant les générateurs sous-utilisés
-     * tout en pénalisant fortement les risques de surcharge.
-     *
-     * @param m la maison à connecter
-     * @param reseau le réseau
-     * @return le générateur optimal, ou null si aucun n'est disponible
-     */
     private static Generateur trouverMeilleurGenerateur(Maison m, Reseau reseau) {
         List<Generateur> generateurs = reseau.getGenerateurs();
         Generateur meilleur = null;
@@ -159,8 +124,9 @@ public class Optimisation {
             double taux = (double) charge / g.getCapacite();
             double score = capaciteRestante * (1.0 - taux);
 
+            // pénalité massive si risque immédiat de dépassement
             if (capaciteRestante < m.getConsommation()) {
-                score -= 100000;
+                score -= 100000.0;
             }
 
             if (score > meilleurScore) {
@@ -173,37 +139,40 @@ public class Optimisation {
     }
 
     /**
-     * Applique le recuit simulé avec refroidissement adaptatif et réchauffe.
-     * <p>
-     * Ajuste dynamiquement la vitesse de refroidissement selon le taux
-     * d'acceptation observé. Réchauffe automatiquement si l'algorithme stagne.
-     * Combine mouvements simples (déplacement) et complexes (swap).
-     *
-     * @param reseau le réseau à optimiser
+     * Recuit simulé adaptatif :
+     * - on effectue des fenêtres de W itérations à température courante,
+     * - on ajuste T UNE FOIS par fenêtre selon le taux d'acceptation,
+     * - reheating si stagnation prolongée (limité).
      */
     private static void recuitSimuleAdaptatif(Reseau reseau) {
         List<Maison> maisons = new ArrayList<>(reseau.getMaisons());
         List<Generateur> generateurs = reseau.getGenerateurs();
+        if (maisons.isEmpty() || generateurs.isEmpty()) return;
+
+        reseau.calculCout(); // garantit cout à jour au démarrage
 
         double temperature = TEMPERATURE_INITIALE;
-        int iterationsParTemp = Math.max(maisons.size() * 2, 20); // Réduit pour éviter trop d'itérations
 
         int iterations = 0;
         int acceptations = 0;
         int ameliorations = 0;
-        int acceptationsFenetre = 0;
+
         int iterationsSansAmelioration = 0;
         double meilleurCout = reseau.getCout();
         int nombreRechauffes = 0;
 
-        while (temperature > TEMPERATURE_MIN && iterations < MAX_ITERATIONS_RECUIT) {
-            for (int i = 0; i < iterationsParTemp && iterations < MAX_ITERATIONS_RECUIT; i++) {
-                iterations++;
-                boolean accepte = false;
+        final int W = TAILLE_FENETRE_ADAPTATION;
 
-                // 30% du temps : tentative de swap, sinon déplacement simple
-                if (random.nextDouble() < PROBABILITE_SWAP && maisons.size() > 1) {
-                    accepte = tentativeSwap(reseau, temperature);
+        while (temperature > TEMPERATURE_MIN && iterations < MAX_ITERATIONS_RECUIT) {
+            int acceptationsFenetre = 0;
+
+            // Fenêtre à température "fixe"
+            for (int k = 0; k < W && iterations < MAX_ITERATIONS_RECUIT; k++) {
+                iterations++;
+
+                boolean accepte;
+                if (random.nextDouble() < PROBABILITE_SWAP && maisons.size() >= 2) {
+                    accepte = tentativeSwap(reseau, maisons, temperature);
                 } else {
                     accepte = tentativeDeplacement(reseau, maisons, generateurs, temperature);
                 }
@@ -224,35 +193,22 @@ public class Optimisation {
                     iterationsSansAmelioration++;
                 }
 
-                // Adaptation du taux de refroidissement
-                if (iterations % TAILLE_FENETRE_ADAPTATION == 0 && acceptationsFenetre > 0) {
-                    double tauxAcceptation = acceptationsFenetre / (double) TAILLE_FENETRE_ADAPTATION;
-
-                    if (tauxAcceptation > 0.85) {
-                        temperature *= 0.95; // Refroidissement rapide
-                    } else if (tauxAcceptation < 0.15) {
-                        temperature *= 0.985; // Refroidissement modéré (pas trop lent)
-                    } else {
-                        temperature *= 0.97; // Normal
-                    }
-
-                    acceptationsFenetre = 0;
-                } else if (iterations % TAILLE_FENETRE_ADAPTATION == 0) {
-                    // Si aucune acceptation, refroidir normalement
-                    temperature *= 0.97;
-                    acceptationsFenetre = 0;
-                }
-
-                // Réchauffe si stagnation (limité)
+                // Reheating si stagnation
                 if (iterationsSansAmelioration > SEUIL_RECHAUFFE && nombreRechauffes < MAX_RECHAUFFES) {
-                    temperature = Math.min(temperature * 15, TEMPERATURE_INITIALE * 0.4);
+                    temperature = Math.min(temperature * 15.0, TEMPERATURE_INITIALE * 0.4);
                     iterationsSansAmelioration = 0;
                     nombreRechauffes++;
                 }
             }
 
-            // Refroidissement par défaut si pas d'adaptation
-            if (iterations % TAILLE_FENETRE_ADAPTATION != 0) {
+            // Ajustement de T UNE FOIS par fenêtre
+            double tauxAcceptation = acceptationsFenetre / (double) W;
+
+            if (tauxAcceptation > 0.85) {
+                temperature *= 0.95;
+            } else if (tauxAcceptation < 0.15) {
+                temperature *= 0.985;
+            } else {
                 temperature *= 0.97;
             }
         }
@@ -261,73 +217,65 @@ public class Optimisation {
             System.out.println("  (Limite d'itérations atteinte)");
         }
 
-        System.out.printf("  Recuit : %d iterations | %d acceptations (%.1f%%) | %d ameliorations | %d rechauffes%n",
+        System.out.printf(
+                "  Recuit : %d itérations | %d acceptations (%.1f%%) | %d améliorations | %d réchauffes%n",
                 iterations, acceptations,
                 iterations > 0 ? 100.0 * acceptations / iterations : 0.0,
-                ameliorations, nombreRechauffes);
+                ameliorations, nombreRechauffes
+        );
     }
 
-    /**
-     * Effectue une tentative de déplacement simple d'une maison.
-     *
-     * @param reseau le réseau
-     * @param maisons liste des maisons
-     * @param generateurs liste des générateurs
-     * @param temperature température actuelle
-     * @return true si le mouvement a été accepté
-     */
-    private static boolean tentativeDeplacement(Reseau reseau, List<Maison> maisons,
-                                                List<Generateur> generateurs, double temperature) {
+    private static boolean tentativeDeplacement(Reseau reseau,
+                                                List<Maison> maisons,
+                                                List<Generateur> generateurs,
+                                                double temperature) {
         if (maisons.isEmpty() || generateurs.isEmpty()) return false;
 
         Maison m = choisirMaisonIntelligente(maisons, reseau);
-        Generateur gNouveau = choisirGenerateurIntelligent(m, generateurs, reseau);
-        Generateur gActuel = reseau.getConnexions().get(m);
+        if (m == null) return false;
 
+        Generateur gNouveau = choisirGenerateurIntelligent(m, generateurs, reseau);
+        if (gNouveau == null) return false;
+
+        Generateur gActuel = reseau.getConnexions().get(m);
         if (gActuel == null || gActuel == gNouveau) return false;
 
         double coutAvant = reseau.getCout();
+
         reseau.changeConnexion(m, gActuel, gNouveau);
         reseau.calculCout();
         double coutApres = reseau.getCout();
+
         double delta = coutApres - coutAvant;
 
         if (delta < 0 || Math.exp(-delta / temperature) > random.nextDouble()) {
             return true;
-        } else {
-            reseau.changeConnexion(m, gNouveau, gActuel);
-            reseau.calculCout();
-            return false;
         }
+
+        // rollback
+        reseau.changeConnexion(m, gNouveau, gActuel);
+        reseau.calculCout();
+        return false;
     }
 
-    /**
-     * Effectue une tentative de swap (échange) entre deux maisons.
-     * <p>
-     * Échange les générateurs de deux maisons prises au hasard.
-     * Ce mouvement permet d'explorer des transitions impossibles
-     * avec des déplacements simples.
-     *
-     * @param reseau le réseau
-     * @param temperature température actuelle
-     * @return true si le swap a été accepté
-     */
-    private static boolean tentativeSwap(Reseau reseau, double temperature) {
-        List<Maison> maisons = new ArrayList<>(reseau.getMaisons());
-
+    private static boolean tentativeSwap(Reseau reseau, List<Maison> maisons, double temperature) {
         if (maisons.size() < 2) return false;
 
-        Maison m1 = maisons.get(random.nextInt(maisons.size()));
-        Maison m2 = maisons.get(random.nextInt(maisons.size()));
+        int i1 = random.nextInt(maisons.size());
+        int i2 = random.nextInt(maisons.size());
+        while (i2 == i1) i2 = random.nextInt(maisons.size());
+
+        Maison m1 = maisons.get(i1);
+        Maison m2 = maisons.get(i2);
 
         Generateur g1 = reseau.getConnexions().get(m1);
         Generateur g2 = reseau.getConnexions().get(m2);
 
-        if (g1 == null || g2 == null || g1 == g2 || m1 == m2) return false;
+        if (g1 == null || g2 == null || g1 == g2) return false;
 
         double coutAvant = reseau.getCout();
 
-        // Swap
+        // swap
         reseau.changeConnexion(m1, g1, g2);
         reseau.changeConnexion(m2, g2, g1);
         reseau.calculCout();
@@ -336,31 +284,20 @@ public class Optimisation {
         double delta = coutApres - coutAvant;
 
         if (delta < 0 || Math.exp(-delta / temperature) > random.nextDouble()) {
-            return true; // Accepté
-        } else {
-            // Annule le swap
-            reseau.changeConnexion(m1, g2, g1);
-            reseau.changeConnexion(m2, g1, g2);
-            reseau.calculCout();
-            return false;
+            return true;
         }
+
+        // rollback du swap
+        reseau.changeConnexion(m1, g2, g1);
+        reseau.changeConnexion(m2, g1, g2);
+        reseau.calculCout();
+        return false;
     }
 
-    /**
-     * Sélectionne une maison prioritaire pour déplacement.
-     * <p>
-     * Privilégie les maisons connectées à des générateurs déséquilibrés
-     * ou surchargés (70% du temps). Effectue une sélection aléatoire
-     * pour diversification (30% du temps).
-     *
-     * @param maisons la liste des maisons disponibles
-     * @param reseau le réseau
-     * @return la maison sélectionnée
-     */
     private static Maison choisirMaisonIntelligente(List<Maison> maisons, Reseau reseau) {
         if (maisons.isEmpty()) return null;
 
-        List<Maison> candidatsPrioritaires = new ArrayList<>();
+        List<Maison> prioritaires = new ArrayList<>();
         double tauxMoyen = reseau.getTauxUtilisationMoyen();
 
         for (Maison m : maisons) {
@@ -368,36 +305,23 @@ public class Optimisation {
             if (g == null) continue;
 
             double taux = g.calculTauxUtilisation();
-
             if (Math.abs(taux - tauxMoyen) > 0.15 || taux > 1.0) {
-                candidatsPrioritaires.add(m);
+                prioritaires.add(m);
             }
         }
 
-        if (!candidatsPrioritaires.isEmpty() && random.nextDouble() < 0.7) {
-            return candidatsPrioritaires.get(random.nextInt(candidatsPrioritaires.size()));
+        if (!prioritaires.isEmpty() && random.nextDouble() < 0.7) {
+            return prioritaires.get(random.nextInt(prioritaires.size()));
         }
 
         return maisons.get(random.nextInt(maisons.size()));
     }
 
-    /**
-     * Sélectionne un générateur cible pour une maison.
-     * <p>
-     * Score les générateurs selon leur proximité au taux moyen d'utilisation,
-     * avec bonus pour les sous-utilisés et pénalité pour risque de surcharge.
-     * Sélection probabiliste parmi les meilleurs candidats.
-     *
-     * @param m la maison à déplacer
-     * @param generateurs la liste des générateurs disponibles
-     * @param reseau le réseau
-     * @return le générateur sélectionné
-     */
     private static Generateur choisirGenerateurIntelligent(Maison m, List<Generateur> generateurs, Reseau reseau) {
         if (generateurs.isEmpty()) return null;
 
         double tauxMoyen = reseau.getTauxUtilisationMoyen();
-        List<GenerateurScore> scores = new ArrayList<>();
+        List<GenerateurScore> scores = new ArrayList<>(generateurs.size());
 
         for (Generateur g : generateurs) {
             double taux = g.calculTauxUtilisation();
@@ -405,34 +329,26 @@ public class Optimisation {
 
             double score = -Math.abs(taux - tauxMoyen);
 
-            if (taux < tauxMoyen) {
-                score += 0.5;
-            }
+            if (taux < tauxMoyen) score += 0.5;
 
-            if (charge + m.getConsommation() > g.getCapacite()) {
-                score -= 10.0;
-            }
+            if (charge + m.getConsommation() > g.getCapacite()) score -= 10.0;
 
             scores.add(new GenerateurScore(g, score));
         }
 
         scores.sort((a, b) -> Double.compare(b.score, a.score));
 
-        if (!scores.isEmpty() && random.nextDouble() < 0.8) {
+        if (random.nextDouble() < 0.8) {
             int maxIdx = Math.min(3, scores.size());
-            int idx = random.nextInt(maxIdx);
-            return scores.get(idx).generateur;
+            return scores.get(random.nextInt(maxIdx)).generateur;
         }
 
         return generateurs.get(random.nextInt(generateurs.size()));
     }
 
-    /**
-     * Classe auxiliaire pour associer un générateur à son score.
-     */
     private static class GenerateurScore {
-        Generateur generateur;
-        double score;
+        final Generateur generateur;
+        final double score;
 
         GenerateurScore(Generateur g, double s) {
             this.generateur = g;
@@ -440,35 +356,25 @@ public class Optimisation {
         }
     }
 
-    /**
-     * Applique une perturbation forte à la solution actuelle.
-     * <p>
-     * Déplace aléatoirement un certain pourcentage de maisons vers
-     * d'autres générateurs. Utilisé dans ILS pour explorer de nouvelles
-     * régions tout en conservant une partie de la structure.
-     *
-     * @param reseau le réseau à perturber
-     * @param proportion proportion de maisons à déplacer (entre 0 et 1)
-     */
     private static void perturbationForte(Reseau reseau, double proportion) {
         List<Maison> maisons = new ArrayList<>(reseau.getMaisons());
         List<Generateur> generateurs = reseau.getGenerateurs();
+        if (maisons.isEmpty() || generateurs.isEmpty()) return;
+
         Collections.shuffle(maisons, random);
 
-        int nbDeplacements = Math.max(1, (int) (maisons.size() * proportion));
+        int nbDeplacements = Math.max(1, (int) Math.floor(maisons.size() * proportion));
 
         for (int i = 0; i < nbDeplacements; i++) {
             Maison m = maisons.get(i);
             Generateur actuel = reseau.getConnexions().get(m);
-
             if (actuel == null) continue;
 
-            // Choisit un générateur différent aléatoirement
-            List<Generateur> autresGenerateurs = new ArrayList<>(generateurs);
-            autresGenerateurs.remove(actuel);
+            List<Generateur> autres = new ArrayList<>(generateurs);
+            autres.remove(actuel);
 
-            if (!autresGenerateurs.isEmpty()) {
-                Generateur nouveau = autresGenerateurs.get(random.nextInt(autresGenerateurs.size()));
+            if (!autres.isEmpty()) {
+                Generateur nouveau = autres.get(random.nextInt(autres.size()));
                 reseau.changeConnexion(m, actuel, nouveau);
             }
         }
@@ -476,16 +382,9 @@ public class Optimisation {
         reseau.calculCout();
     }
 
-    /**
-     * Applique une descente locale pure jusqu'à convergence.
-     * <p>
-     * Accepte uniquement les mouvements strictement améliorants.
-     * S'arrête quand aucune amélioration n'est possible ou après
-     * un nombre maximal d'itérations.
-     *
-     * @param reseau le réseau à optimiser
-     */
     private static void descenteLocale(Reseau reseau) {
+        reseau.calculCout();
+
         boolean amelioration = true;
         int iterations = 0;
         int ameliorationsTotales = 0;
@@ -508,6 +407,7 @@ public class Optimisation {
                     if (gActuel == gNouveau) continue;
 
                     double coutAvant = reseau.getCout();
+
                     reseau.changeConnexion(m, gActuel, gNouveau);
                     reseau.calculCout();
                     double coutApres = reseau.getCout();
@@ -515,8 +415,9 @@ public class Optimisation {
                     if (coutApres < coutAvant) {
                         amelioration = true;
                         ameliorationsTotales++;
-                        gActuel = gNouveau;
+                        gActuel = gNouveau; // on conserve le changement
                     } else {
+                        // rollback
                         reseau.changeConnexion(m, gNouveau, gActuel);
                         reseau.calculCout();
                     }
@@ -524,45 +425,41 @@ public class Optimisation {
             }
         }
 
-        System.out.printf("  Descente : %d iterations | %d ameliorations%n",
-                iterations, ameliorationsTotales);
+        System.out.printf("  Descente : %d itérations | %d améliorations%n", iterations, ameliorationsTotales);
     }
 
     /**
-     * Restaure une solution sauvegardée dans le réseau.
-     *
-     * @param solution la map maison-générateur à restaurer
-     * @param reseau le réseau cible
+     * Restauration plus robuste :
+     *  - si actuel != cible : on replace (changeConnexion)
+     *  - gère aussi les cas où une des deux connexions serait null (si ton modèle l'autorise)
      */
     private static void restaurerSolution(Map<Maison, Generateur> solution, Reseau reseau) {
         if (solution == null) return;
 
-        for (Map.Entry<Maison, Generateur> entry : solution.entrySet()) {
-            Generateur actuel = reseau.getConnexions().get(entry.getKey());
-            Generateur cible = entry.getValue();
+        for (Map.Entry<Maison, Generateur> e : solution.entrySet()) {
+            Maison m = e.getKey();
+            Generateur cible = e.getValue();
+            Generateur actuel = reseau.getConnexions().get(m);
 
-            if (actuel != cible && actuel != null && cible != null) {
-                reseau.changeConnexion(entry.getKey(), actuel, cible);
+            if (actuel == cible) continue;
+
+            if (actuel == null && cible != null) {
+                reseau.addConnexion(m, cible);
+            } else if (actuel != null && cible == null) {
+                reseau.supprConnexion(m, actuel);
+            } else if (actuel != null) {
+                reseau.changeConnexion(m, actuel, cible);
             }
         }
+
+        reseau.calculCout();
     }
 
-    /**
-     * Affiche un rapport détaillé du réseau optimisé.
-     * <p>
-     * Présente pour chaque générateur : charge, taux d'utilisation,
-     * maisons connectées. Affiche ensuite les statistiques globales
-     * et le coût total final.
-     *
-     * @param reseau le réseau à afficher
-     */
     public static void afficherDetails(Reseau reseau) {
         System.out.println("=== DETAILS DU RESEAU OPTIMISE ===\n");
 
         List<String> nomsGen = new ArrayList<>();
-        for (Generateur g : reseau.getGenerateurs()) {
-            nomsGen.add(g.getNom());
-        }
+        for (Generateur g : reseau.getGenerateurs()) nomsGen.add(g.getNom());
         Collections.sort(nomsGen);
 
         for (String nomGen : nomsGen) {
@@ -570,6 +467,7 @@ public class Optimisation {
             Set<Maison> maisons = reseau.getMaisons(g);
 
             int charge = g.getChargeActuelle();
+
             List<String> infosMaisons = new ArrayList<>();
             for (Maison m : maisons) {
                 infosMaisons.add(m.getNom() + "(" + m.getConsommation() + "kW)");
@@ -579,20 +477,19 @@ public class Optimisation {
             double taux = g.calculTauxUtilisation();
 
             System.out.printf("%s (capacite : %dkW)%n", g.getNom(), g.getCapacite());
-            System.out.printf("  Charge : %d/%dkW | Taux : %.3f%n", charge, g.getCapacite(), taux);
-            System.out.println("  Maisons : " +
-                    (infosMaisons.isEmpty() ? "(aucune)" : String.join(", ", infosMaisons)));
-            if (taux > 1.0) System.out.println("  /!\\ SURCHARGE");
+            System.out.printf("  Charge : %d/%dkW | Taux : %.6f%n", charge, g.getCapacite(), taux);
+            System.out.println("  Maisons : " + (infosMaisons.isEmpty() ? "(aucune)" : String.join(", ", infosMaisons)));
+            if (taux > 1.0) System.out.println("  ATTENTION : SURCHARGE");
             System.out.println();
         }
 
         reseau.calculCout();
         System.out.println("--- STATISTIQUES GLOBALES ---");
-        System.out.printf("Taux moyen      : %.5f%n", reseau.getTauxUtilisationMoyen());
-        System.out.printf("Dispersion      : %.5f%n", reseau.getDisp());
-        System.out.printf("Surcharge       : %.5f%n", reseau.getSurcharge());
-        System.out.printf("Penalite lambda : %.5f%n", reseau.getPenalite());
-        System.out.printf("COUT TOTAL      : %.5f%n", reseau.getCout());
+        System.out.printf("Taux moyen      : %.6f%n", reseau.getTauxUtilisationMoyen());
+        System.out.printf("Dispersion      : %.6f%n", reseau.getDisp());
+        System.out.printf("Surcharge       : %.6f%n", reseau.getSurcharge());
+        System.out.printf("Penalite lambda : %.6f%n", reseau.getPenalite());
+        System.out.printf("COUT TOTAL      : %.6f%n", reseau.getCout());
         System.out.println();
     }
 }
