@@ -1,6 +1,7 @@
 ## Projet programmation avancée et applications - Réseau de distribution d'électricité
 
 Ce dépôt contient la version avec **interface utilisateur graphique** du système de gestion de réseau de distribution d'électricité en utilisant **JavaFX**.
+Groupe de TD du mercredi matin, Groupe 8 : TASKIN Ozan et BELHARRAT Mohamed
 
 ---
 
