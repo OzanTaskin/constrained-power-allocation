@@ -27,31 +27,31 @@ Pour compiler et exécuter le projet sans Maven, suivez ces étapes :
 3.  **Exécution** : Après la compilation, vous pouvez exécuter l'application avec la commande suivante :
 
     ```bash
-    java --module-path <CHEMIN_VERS_JAVAFX_LIB>:target/classes --add-modules javafx.controls,javafx.fxml -m UI/main.MainUI
+    java --module-path <CHEMIN_VERS_JAVAFX_LIB>:target/classes --add-modules javafx.controls,javafx.fxml -m ui/main.MainUI
     ```
 
     Pour lancer l'application en chargeant un réseau depuis un fichier, passez le chemin du fichier en argument :
 
     ```bash
-    java --module-path <CHEMIN_VERS_JAVAFX_LIB>:target/classes --add-modules javafx.controls,javafx.fxml -m UI/main.MainUI <chemin_vers_le_fichier>
+    java --module-path <CHEMIN_VERS_JAVAFX_LIB>:target/classes --add-modules javafx.controls,javafx.fxml -m ui/main.MainUI <chemin_vers_le_fichier>
     ```
 
     Pour inclure une valeur de pénalité personnalisée (un nombre flottant) en plus du fichier de configuration :
 
     ```bash
-    java --module-path <CHEMIN_VERS_JAVAFX_LIB>:target/classes --add-modules javafx.controls,javafx.fxml -m UI/main.MainUI <chemin_vers_le_fichier> <valeur_penalite>
+    java --module-path <CHEMIN_VERS_JAVAFX_LIB>:target/classes --add-modules javafx.controls,javafx.fxml -m ui/main.MainUI <chemin_vers_le_fichier> <valeur_penalite>
     ```
 
     Par exemple :
 
     ```bash
-    java --module-path <CHEMIN_VERS_JAVAFX_LIB>:target/classes --add-modules javafx.controls,javafx.fxml -m UI/main.MainUI reseau.txt 10.0
+    java --module-path <CHEMIN_VERS_JAVAFX_LIB>:target/classes --add-modules javafx.controls,javafx.fxml -m ui/main.MainUI reseau.txt 10.0
     ```
 
     Vous avez également la possibilité de mettre uniquement la pénalité (par défaut a 10.0) :
 
     ```bash
-    java --module-path <CHEMIN_VERS_JAVAFX_LIB>:target/classes --add-modules javafx.controls,javafx.fxml -m UI/main.MainUI <valeur_penalite>
+    java --module-path <CHEMIN_VERS_JAVAFX_LIB>:target/classes --add-modules javafx.controls,javafx.fxml -m ui/main.MainUI <valeur_penalite>
     ```
 
 NB : Un main sans l'interface graphique est également disponible dans le code en cas de problème dans le package Menu
