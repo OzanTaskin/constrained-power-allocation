@@ -1,9 +1,9 @@
 package main;
 
-import UI.controller.MainController;
-import UI.view.ControlsView;
-import UI.view.NetworkView;
-import UI.view.TerminalView;
+import ui.controller.MainController;
+import ui.view.ControlsView;
+import ui.view.NetworkView;
+import ui.view.TerminalView;
 import factory.ReseauFactory;
 import javafx.application.Application;
 import javafx.collections.FXCollections;

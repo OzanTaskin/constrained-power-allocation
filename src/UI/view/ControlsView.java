@@ -1,4 +1,4 @@
-package UI.view;
+package ui.view;
 
 import javafx.collections.ObservableList;
 import javafx.geometry.Insets;

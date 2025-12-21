@@ -1,8 +1,8 @@
-package UI.controller;
+package ui.controller;
 
-import UI.view.ControlsView;
-import UI.view.NetworkView;
-import UI.view.TerminalView;
+import ui.view.ControlsView;
+import ui.view.NetworkView;
+import ui.view.TerminalView;
 import javafx.collections.ObservableList;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;

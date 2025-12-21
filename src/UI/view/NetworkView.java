@@ -1,4 +1,4 @@
-package UI.view;
+package ui.view;
 
 import javafx.scene.layout.Pane;
 import javafx.scene.paint.Color;
