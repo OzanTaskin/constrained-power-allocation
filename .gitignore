@@ -37,3 +37,25 @@ build/
 
 ### Mac OS ###
 .DS_Store
+
+# IntelliJ IDEA
+.idea/
+*.iml
+
+# Build outputs
+target/
+out/
+build/
+
+# Logs
+*.log
+
+# OS / misc
+.DS_Store
+
+# Archives (ne pas versionner)
+*.zip
+*.jar
+
+# (Optionnel) si tu utilises des env locaux
+.env
